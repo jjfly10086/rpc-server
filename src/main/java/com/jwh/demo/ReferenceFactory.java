@@ -1,20 +1,21 @@
 package com.jwh.demo;
 
 import com.jwh.demo.annotation.RpcReference;
+import com.jwh.demo.zk.SubscribeFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 
 /**
  * Created by Administrator on 2017/10/11 0011.
  */
 public class ReferenceFactory implements ApplicationContextAware{
 
-    private String hostName;
-
-    private Integer port;
+    private String zkUrl;
+    private Integer zkSessionTimeout;
 
     private static ApplicationContext applicationContext;
 
@@ -23,12 +24,12 @@ public class ReferenceFactory implements ApplicationContextAware{
         applicationContext = ctx;
     }
 
-    public void setHostName(String hostName) {
-        this.hostName = hostName;
+    public void setZkUrl(String zkUrl) {
+        this.zkUrl = zkUrl;
     }
 
-    public void setPort(Integer port) {
-        this.port = port;
+    public void setZkSessionTimeout(Integer zkSessionTimeout) {
+        this.zkSessionTimeout = zkSessionTimeout;
     }
 
     /**
@@ -36,6 +37,9 @@ public class ReferenceFactory implements ApplicationContextAware{
      * @throws Exception
      */
     public void init() throws Exception{
+        //获取zk注册的服务
+        SubscribeFactory subscribeFactory = SubscribeFactory.newInstance("/services",zkUrl,zkSessionTimeout);
+        Map<String,Object> serviceMap = subscribeFactory.getServices();
         //Bean ID
         String[] beanNames = applicationContext.getBeanDefinitionNames();
         for(String beanId : beanNames){
@@ -45,6 +49,12 @@ public class ReferenceFactory implements ApplicationContextAware{
             for(Field field : fields){
                 RpcReference reference = field.getAnnotation(RpcReference.class);
                 if(reference!=null){
+                    String data = (String) serviceMap.get(field.getType().getName());
+                    if(data == null){
+                        throw new RuntimeException("no provider "+field.getType().getName()+" exists");
+                    }
+                    String hostName = data.substring(0,data.indexOf(":"));
+                    Integer port = Integer.parseInt(data.substring(data.indexOf(":")+1,data.length()));
                     Object value = NIOClientTest.refer(field.getType(),hostName,port);
                     if (value != null) {
                         if(!field.isAccessible()){

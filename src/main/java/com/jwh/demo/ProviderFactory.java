@@ -2,11 +2,15 @@ package com.jwh.demo;
 
 
 import com.jwh.demo.annotation.RpcProvider;
-import com.jwh.demo.zk.ServerZookeeper;
+import com.jwh.demo.service.ITestInterface;
+import com.jwh.demo.service.impl.TestInterfaceImpl;
+import com.jwh.demo.zk.RegisterFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,9 +20,9 @@ import java.util.Set;
 public class ProviderFactory implements ApplicationContextAware{
 
     private String zkUrl;
-    private Integer timeout;
-    private String localAddress;
-    private Integer port;
+    private Integer zkSessionTimeout;
+    private Integer providerPort;
+    private String[] classNames;
 
     private static ApplicationContext applicationContext;
 
@@ -26,16 +30,12 @@ public class ProviderFactory implements ApplicationContextAware{
         this.zkUrl = zkUrl;
     }
 
-    public void setTimeout(Integer timeout) {
-        this.timeout = timeout;
+    public void setZkSessionTimeout(Integer zkSessionTimeout) {
+        this.zkSessionTimeout = zkSessionTimeout;
     }
 
-    public void setLocalAddress(String localAddress) {
-        this.localAddress = localAddress;
-    }
-
-    public void setPort(Integer port) {
-        this.port = port;
+    public void setProviderPort(Integer providerPort) {
+        this.providerPort = providerPort;
     }
 
     public void setApplicationContext(ApplicationContext context) throws BeansException {
@@ -51,26 +51,34 @@ public class ProviderFactory implements ApplicationContextAware{
         String[] beanNames = applicationContext.getBeanDefinitionNames();
         //从spring中获取对应类的实例
         Set<Object> services = new HashSet<>();
+        Set<String> serviceNames = new HashSet<>();
         for(String name : beanNames){
             Object obj = applicationContext.getBean(name);
             RpcProvider rpcProvider = obj.getClass().getAnnotation(RpcProvider.class);
             if(rpcProvider != null){
                 services.add(obj);
-                //注册服务到zk
-                try{
-                    ServerZookeeper.zkUrl = zkUrl;
-                    ServerZookeeper.timeout = timeout;
-                    ServerZookeeper.zkConnect();
-                    ServerZookeeper.createNode(localAddress,port,obj.getClass().getName());
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
+                serviceNames.add(obj.getClass().getInterfaces()[0].getName());
             }
+        }
+        //注册服务
+        RegisterFactory registerFactory = RegisterFactory.newInstance("/services",zkUrl, zkSessionTimeout);
+        try{
+            classNames = new String[serviceNames.size()];
+            serviceNames.toArray(classNames);
+            registerFactory.registerServices(classNames,InetAddress.getLocalHost().getHostAddress()+":"+ providerPort);
+        }catch (UnknownHostException e){
+            e.printStackTrace();
         }
         //新开线程，避免阻塞spring容器启动；
         new Thread(()->{
             //暴露接口实例
-            NIOServerTest.provide(services,port);
+            NIOServerTest.provide(services, providerPort);
         }).start();
     }
+
+    public void destroy(){
+        RegisterFactory registerFactory = RegisterFactory.newInstance("/services",zkUrl, zkSessionTimeout);
+        registerFactory.deleteServices(classNames);
+    }
+
 }
