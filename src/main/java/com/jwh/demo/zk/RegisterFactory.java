@@ -1,5 +1,6 @@
 package com.jwh.demo.zk;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
@@ -153,7 +154,8 @@ public class RegisterFactory {
 
     public static void main(String[] args) throws UnknownHostException{
         RegisterFactory registerFactory = new RegisterFactory("/services", "10.10.10.34", 2181, 3000, 5001);
-        registerFactory.registerServices(Arrays.asList("com.jwh.demo.service.ITestInterface"), InetAddress.getLocalHost().getHostAddress()+":"+8080);
-//        registerFactory.deleteServices(new String[]{"com.jwh.demo.service.ITestInterface"});
+        ZkDataNode node = new ZkDataNode(InetAddress.getLocalHost().getHostAddress(), 8081);
+        registerFactory.registerServices(Arrays.asList("com.jwh.demo.service.ITestInterface"), JSON.toJSONString(node));
+//        registerFactory.deleteServices(Arrays.asList("com.jwh.demo.service.ITestInterface"));
     }
 }
