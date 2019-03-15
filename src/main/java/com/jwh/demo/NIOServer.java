@@ -14,6 +14,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -21,7 +22,7 @@ import java.util.Set;
 /**
  * Created by Administrator
  */
-public class NIOServerTest {
+public class NIOServer {
 
     private static final int BUF_SIZE=1024;
     private static final int PORT = 8080;
@@ -31,14 +32,18 @@ public class NIOServerTest {
      * 读取信息并执行
      * @param key
      */
-    public static void handleRead(SelectionKey key,Set<Object> serviceImpls){
+    public static void handleRead(SelectionKey key,Collection<Object> serviceImpls){
         SocketChannel sc = (SocketChannel)key.channel();
         ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
         long bytesRead = 0;
         try{
             bytesRead = sc.read(buf);
             if(bytesRead>0){
-                RemoteCallBody body = (RemoteCallBody) ByteArrayUtils.byteArrayToObject(buf.array());
+                Object obj = ByteArrayUtils.byteArrayToObject(buf.array());
+                if(obj == null){
+                    throw new RuntimeException("read message is null");
+                }
+                RemoteCallBody body = (RemoteCallBody) obj;
                 System.out.println("remote address:"+sc.getRemoteAddress()+"&"+body.toString());
                 //调用
                 Class cls = Class.forName(body.getServiceName());
@@ -49,8 +54,7 @@ public class NIOServerTest {
                 handleWrite(key,result);
             }
             System.out.println();
-        }catch (IOException | ClassNotFoundException | NoSuchMethodException
-                | IllegalAccessException | InvocationTargetException e){
+        }catch (Exception e){
             try {
                 sc.close();
             }catch (IOException e2){
@@ -90,7 +94,7 @@ public class NIOServerTest {
      * @param interfaceClass
      * @return
      */
-    public static Object chooseCallService(Set<Object> serviceImpls, Class<?> interfaceClass){
+    public static Object chooseCallService(Collection<Object> serviceImpls, Class<?> interfaceClass){
         for(Object obj : serviceImpls){
            if(interfaceClass.isInstance(obj)){
                return obj;
@@ -103,7 +107,7 @@ public class NIOServerTest {
      * @param serviceImpls
      * @param port
      */
-    public static void provide(Set<Object> serviceImpls, Integer port) {
+    public static void provide(Collection<Object> serviceImpls, Integer port) {
         nioServerStart(serviceImpls,port);
     }
 
@@ -112,7 +116,7 @@ public class NIOServerTest {
      * @param serviceImpls
      * @param port
      */
-    public static void nioServerStart(Set<Object> serviceImpls,Integer port){
+    public static void nioServerStart(Collection<Object> serviceImpls,Integer port){
         Selector selector = null;
         ServerSocketChannel ssc = null;
         try{
@@ -167,8 +171,6 @@ public class NIOServerTest {
         Set<Object> services = new HashSet<>();
         services.add(testInterface);
         services.add(testInterface2);
-
-        //新开线程，避免阻塞spring容器启动；
         new Thread(()->{
             //暴露接口实例
             provide(services,PORT);

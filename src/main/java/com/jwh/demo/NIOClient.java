@@ -15,7 +15,7 @@ import java.util.Iterator;
 /**
  * Created by Administrator
  */
-public class NIOClientTest {
+public class NIOClient {
 
     public static Object nioClient(RemoteCallBody body) {
         Object result = null;
@@ -107,9 +107,9 @@ public class NIOClientTest {
     }
 
     public static void main(String[] args) throws Exception {
-        ITestInterface testInterface = refer(ITestInterface.class, "192.168.17.148", 8080);
+        ITestInterface testInterface = refer(ITestInterface.class, "10.10.10.34", 8080);
         testInterface.getCurrentUserNum();
-        ITestInterface2 testInterface2 = refer(ITestInterface2.class, "192.168.17.148", 8080);
+        ITestInterface2 testInterface2 = refer(ITestInterface2.class, "10.10.10.34", 8080);
         testInterface2.checkNum();
     }
 }

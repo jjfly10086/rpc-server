@@ -4,40 +4,93 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Collection;
 
 /**
- * Created by Administrator on 2017/10/13 0013.
+ * @author jiangwenhua
  */
+@ConfigurationProperties(prefix = "com.jwh.demo.register")
 public class RegisterFactory {
 
-    private  String servicesRootDir;
+    // 根节点名称
+    private String servicesRootDir;
 
-    private   String zkUrl;
+    // zk服务Host
+    private String zkHost;
 
-    private   Integer sessionTimeout;
+    // zk服务端口
+    private Integer zkPort;
+
+    // zk连接超时时间
+    private Integer sessionTimeout;
+
+    // 服务暴露端口
+    private Integer exportPort;
 
     private static ZooKeeper zk;
 
-    private static RegisterFactory registerFactory;
 
-    private RegisterFactory(String servicesRootDir,String zkUrl,Integer sessionTimeout){
+    public RegisterFactory() {
+    }
+
+    public RegisterFactory(String servicesRootDir, String zkHost, Integer zkPort, Integer sessionTimeout, Integer exportPort) {
         this.servicesRootDir = servicesRootDir;
-        this.zkUrl = zkUrl;
+        this.zkHost = zkHost;
+        this.zkPort = zkPort;
+        this.sessionTimeout = sessionTimeout;
+        this.exportPort = exportPort;
+    }
+
+    public String getServicesRootDir() {
+        return servicesRootDir;
+    }
+
+    public String getZkHost() {
+        return zkHost;
+    }
+
+    public Integer getSessionTimeout() {
+        return sessionTimeout;
+    }
+
+    public void setServicesRootDir(String servicesRootDir) {
+        this.servicesRootDir = servicesRootDir;
+    }
+
+    public void setZkHost(String zkHost) {
+        this.zkHost = zkHost;
+    }
+
+    public void setSessionTimeout(Integer sessionTimeout) {
         this.sessionTimeout = sessionTimeout;
     }
-    public  static RegisterFactory newInstance(String servicesRootDir,String zkUrl,Integer sessionTimeout){
-        if(registerFactory == null) {
-            registerFactory = new RegisterFactory(servicesRootDir, zkUrl, sessionTimeout);
-        }
-        return registerFactory;
+
+    public Integer getExportPort() {
+        return exportPort;
     }
+
+    public void setExportPort(Integer exportPort) {
+        this.exportPort = exportPort;
+    }
+
+    public Integer getZkPort() {
+        return zkPort;
+    }
+
+    public void setZkPort(Integer zkPort) {
+        this.zkPort = zkPort;
+    }
+
     private void connect(){
         // 创建一个与服务器的连接
         try{
+            String zkUrl = zkHost + ":" +zkPort;
             zk = new ZooKeeper(zkUrl,sessionTimeout,null);
         }catch (IOException e){
             e.printStackTrace();
@@ -75,18 +128,18 @@ public class RegisterFactory {
             e.printStackTrace();
         }
     }
-    public void registerServices(String[] services,String data){
+    public void registerServices(Collection<String> interfaceNames, String data){
         connect();
         createRoot();
-        for(String serviceName : services){
+        for(String serviceName : interfaceNames){
             createServiceNode(serviceName,data);
         }
         closeConnect();
     }
-    public void deleteServices(String[] services){
+    public void deleteServices(Collection<String> interfaceNames){
         try{
             connect();
-            for(String serviceName : services){
+            for(String serviceName : interfaceNames){
                 if(zk.exists(servicesRootDir+"/"+serviceName,false) != null){
                     zk.delete(servicesRootDir+"/"+serviceName,-1);
                 }
@@ -96,9 +149,11 @@ public class RegisterFactory {
         }
 
     }
+
+
     public static void main(String[] args) throws UnknownHostException{
-        RegisterFactory registerFactory = RegisterFactory.newInstance("/services","192.168.17.148:2181",3000);
-        registerFactory.registerServices(new String[]{"com.jwh.demo.ITestInterface"}, InetAddress.getLocalHost().getHostAddress()+":"+8000);
-        registerFactory.deleteServices(new String[]{"com.jwh.demo.ITestInterface"});
+        RegisterFactory registerFactory = new RegisterFactory("/services", "10.10.10.34", 2181, 3000, 5001);
+        registerFactory.registerServices(Arrays.asList("com.jwh.demo.service.ITestInterface"), InetAddress.getLocalHost().getHostAddress()+":"+8080);
+//        registerFactory.deleteServices(new String[]{"com.jwh.demo.service.ITestInterface"});
     }
 }
